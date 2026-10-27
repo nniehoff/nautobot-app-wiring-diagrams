@@ -1,0 +1,32 @@
+{
+    "type": "object",
+    "properties": {
+        "cable_type_colors": {
+            "type": "object",
+            "description": "Map of Cable type value (e.g. \"cat6\", \"smf\") to a hex color used when a cable has no color of its own.",
+            "additionalProperties": {
+                "type": "string",
+                "pattern": "^#?[0-9a-fA-F]{6}$"
+            },
+            "default": {}
+        },
+        "default_cable_color": {
+            "type": "string",
+            "description": "Hex color for cables with no color of their own and no type color.",
+            "pattern": "^#?[0-9a-fA-F]{6}$",
+            "default": "#6c757d"
+        },
+        "default_rankdir": {
+            "type": "string",
+            "description": "Default Graphviz layout direction.",
+            "enum": ["LR", "TB"],
+            "default": "LR"
+        },
+        "max_nodes": {
+            "type": "integer",
+            "description": "Refuse to render diagrams with more nodes than this.",
+            "minimum": 1,
+            "default": 500
+        }
+    }
+}

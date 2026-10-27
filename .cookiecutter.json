@@ -1,0 +1,30 @@
+{
+    "cookiecutter": {
+        "codeowner_github_usernames": "@nniehoff",
+        "full_name": "Nick Niehoff",
+        "email": "claude@nickniehoff.net",
+        "github_org": "nniehoff",
+        "app_name": "nautobot_wiring_diagrams",
+        "verbose_name": "Nautobot Wiring Diagrams",
+        "app_slug": "nautobot-wiring-diagrams",
+        "project_slug": "nautobot-app-wiring-diagrams",
+        "repo_url": "https://github.com/nniehoff/nautobot-app-wiring-diagrams",
+        "base_url": "wiring-diagrams",
+        "camel_name": "WiringDiagrams",
+        "project_short_description": "Render wiring diagrams from Nautobot cables for a Location, Rack, or Device",
+        "model_class_name": "None",
+        "open_source_license": "Apache-2.0",
+        "docs_base_url": "https://docs.nautobot.com",
+        "docs_app_url": "https://docs.nautobot.com/projects/wiring-diagrams/en/latest",
+        "_drift_manager": {
+            "template": "https://github.com/nautobot/cookiecutter-nautobot-app.git",
+            "template_dir": "nautobot-app",
+            "template_ref": "nautobot-app-v3.1.4",
+            "cookie_dir": "",
+            "pull_request_strategy": "create",
+            "post_actions": [],
+            "draft": false,
+            "drift_managed_branch": "develop"
+        }
+    }
+}
