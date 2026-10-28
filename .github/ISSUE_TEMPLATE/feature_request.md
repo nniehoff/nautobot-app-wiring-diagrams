@@ -6,7 +6,7 @@ labels:
 ---
 
 ### Environment
-* Nautobot version:  <!-- Example: 3.1.0 -->
+* Nautobot version:  <!-- Example: 3.2.0 -->
 * nautobot-wiring-diagrams version:  <!-- Example: 1.0.0 -->
 
 <!--
