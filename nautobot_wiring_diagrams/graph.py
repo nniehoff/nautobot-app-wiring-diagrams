@@ -1,5 +1,6 @@
 """Build a wiring graph for a Location, Rack, or Device from Nautobot cables."""
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 from django.contrib.contenttypes.models import ContentType
@@ -13,6 +14,9 @@ CONNECTION_KINDS = {
     "console": ("console_port", "console_server_port"),
     "power": ("power_port", "power_outlet", "power_feed"),
 }
+# Power is left out by default: UPS and PDU cables cross the whole diagram.
+DEFAULT_KINDS = ("data", "console")
+KIND_OF_FK = {fk: kind for kind, fks in CONNECTION_KINDS.items() for fk in fks}
 # Patch panel ports; hidden when patch panels are collapsed.
 PASS_THROUGH_FKS = ("front_port", "rear_port")
 # Display order of port kinds within a node.
@@ -40,7 +44,7 @@ class DiagramOptions:
 
     cable_types: list = field(default_factory=list)
     statuses: list = field(default_factory=list)
-    kinds: list = field(default_factory=lambda: list(CONNECTION_KINDS))
+    kinds: list = field(default_factory=lambda: list(DEFAULT_KINDS))
     collapse_patch_panels: bool = False
 
     @property
@@ -60,7 +64,7 @@ class Port:
 
 
 @dataclass
-class Node:
+class Node:  # pylint: disable=too-many-instance-attributes
     """A device, circuit, or power panel in the diagram."""
 
     id: str
@@ -69,6 +73,8 @@ class Node:
     url: str
     in_scope: bool
     group: str = ""
+    rack: str = ""
+    position: int = None
     ports: dict = field(default_factory=dict)
 
     def sorted_ports(self):
@@ -86,6 +92,7 @@ class Edge:
     b_port: str
     cable: Cable
     via_patch_panel: bool = False
+    kind: str = "data"
 
 
 class WiringGraph:
@@ -136,6 +143,7 @@ class WiringGraph:
                 b_port=b_end[1].id,
                 cable=cable,
                 via_patch_panel=via_patch_panel,
+                kind=KIND_OF_FK.get(termination_fk(a_termination), "data"),
             )
         )
 
@@ -149,6 +157,8 @@ class WiringGraph:
                 url=parent.get_absolute_url(),
                 in_scope=parent.pk in self.device_ids,
                 group=parent.rack.name if parent.rack_id and parent.pk in self.device_ids else "",
+                rack=parent.rack.name if parent.rack_id else "",
+                position=parent.position,
             )
         return Node(
             id=node_id,
@@ -285,3 +295,208 @@ def _add_path_edges(graph, path_origins):
 def _object_key(obj):
     """Key unique across models."""
     return f"{obj._meta.label_lower}:{obj.pk}"
+
+
+def assign_columns(graph):
+    """Place each node in a column: busiest devices at 0, their peers at -1/+1, the peers' peers at -2/+2, ...
+
+    Within each connected group of nodes, those with at least two thirds as many cabled ports as the busiest one
+    form the middle column. Every other node goes one column further out than the neighbor that reaches it first, on
+    the same side, so most cables span a single column. A redundant pair (two busiest nodes) is split instead;
+    see `_pair_columns`.
+    """
+    neighbors = _neighbors(graph)
+    ports = {node.id: len(node.ports) for node in graph.nodes.values()}
+    labels = {node.id: node.label for node in graph.nodes.values()}
+    columns = {}
+    side_sizes = {-1: 0, 1: 0}
+    for component in _components(ports, neighbors):
+        busiest = max(ports[node_id] for node_id in component)
+        core = sorted(
+            (node_id for node_id in component if ports[node_id] * 3 >= busiest * 2),
+            key=lambda node_id: (labels[node_id], node_id),
+        )
+        if busiest <= 1:
+            core = core[:1]  # Only single cables: one end in the middle, the other beside it.
+        branches = _branches(core, neighbors, ports)
+        if len(core) == 2:
+            columns.update(_pair_columns(core, branches, neighbors))
+        else:
+            columns.update(dict.fromkeys(core, 0))
+            _side_columns(branches, neighbors, columns, side_sizes)
+    return columns
+
+
+def _neighbors(graph):
+    """Map node id to the ids of the nodes it is cabled to."""
+    neighbors = defaultdict(set)
+    for edge in graph.edges:
+        if edge.a_node != edge.b_node:
+            neighbors[edge.a_node].add(edge.b_node)
+            neighbors[edge.b_node].add(edge.a_node)
+    return neighbors
+
+
+def _side_columns(branches, neighbors, columns, side_sizes):
+    """Send each branch left or right of the middle: toward more of its neighbors, else to the emptier side."""
+    for root, members in sorted(branches.items(), key=lambda item: (-len(item[1]), item[0])):
+        placed = [columns[peer] for peer in neighbors[root] if peer in columns]
+        affinity = {-1: sum(column < 0 for column in placed), 1: sum(column > 0 for column in placed)}
+        side = max((-1, 1), key=lambda candidate, affinity=affinity: (affinity[candidate], -side_sizes[candidate]))
+        side_sizes[side] += len(members)
+        for node_id, depth in members:
+            columns[node_id] = side * depth
+
+
+def _pair_columns(core, branches, neighbors):
+    """Columns for a redundant pair: `left | nodes cabled to both | right`.
+
+    Nodes cabled to both members sit in column 0, so each has one short cable to either side. Whatever hangs
+    off them fills the columns between them and the pair, and nodes cabled to one member go outside it.
+    """
+    left, right = core
+    shared = {root for root in branches if {left, right} <= neighbors[root]}
+    reach = max((depth for root in shared for _, depth in branches[root]), default=1)
+    columns = {left: -reach, right: reach}
+    side_sizes = {-1: 0, 1: 0}
+    for root, members in sorted(branches.items(), key=lambda item: (-len(item[1]), item[0])):
+        if root in shared:
+            side = min((-1, 1), key=lambda candidate: (side_sizes[candidate], candidate))
+            side_sizes[side] += len(members) - 1
+            for node_id, depth in members:
+                columns[node_id] = side * (depth - 1)
+        else:
+            side = -1 if left in neighbors[root] else 1
+            for node_id, depth in members:
+                columns[node_id] = side * (reach + depth)
+    return columns
+
+
+def _components(node_ids, neighbors):
+    """Connected groups of node ids, largest first."""
+    seen = set()
+    components = []
+    for start in node_ids:
+        if start in seen:
+            continue
+        seen.add(start)
+        component, queue = [], [start]
+        while queue:
+            node_id = queue.pop()
+            component.append(node_id)
+            for peer in sorted(neighbors[node_id] - seen):
+                seen.add(peer)
+                queue.append(peer)
+        components.append(sorted(component))
+    return sorted(components, key=len, reverse=True)
+
+
+def _branches(core, neighbors, ports):
+    """Breadth-first from `core`: map each first-ring node to `[(node_id, depth), ...]` reached through it."""
+    depth = dict.fromkeys(core, 0)
+    root_of = {}
+    ring = list(core)
+    while ring:
+        next_ring = []
+        for node_id in sorted(ring, key=lambda node_id: (-ports[node_id], node_id)):
+            for peer in sorted(neighbors[node_id]):
+                if peer in depth:
+                    continue
+                depth[peer] = depth[node_id] + 1
+                root_of[peer] = root_of.get(node_id, peer)
+                next_ring.append(peer)
+        ring = next_ring
+    branches = defaultdict(list)
+    for node_id, root in root_of.items():
+        branches[root].append((node_id, depth[node_id]))
+    return branches
+
+
+def order_columns(graph, columns):
+    """Order each column's node ids top to bottom so cables run as level as possible.
+
+    Columns are placed busiest first. Each node then sorts by the average height of the ports it is cabled to
+    in columns already placed, measured as a fraction of that column's height. Nodes with cables to columns
+    not yet placed (switches with their own devices hanging off them) go below the rest, where those devices
+    have room, and nodes with no placed cables go last. Ties keep rack order.
+    """
+    nodes = {node.id: node for node in graph.nodes.values()}
+    by_column = defaultdict(list)
+    for node in sorted(nodes.values(), key=rack_sort_key):
+        by_column[columns[node.id]].append(node.id)
+    placer = _ColumnPlacer(graph)
+    busiest_first = sorted(
+        by_column, key=lambda column: (-max(len(nodes[n].ports) for n in by_column[column]), abs(column), column)
+    )
+    return {column: placer.place(by_column[column]) for column in busiest_first}
+
+
+class _ColumnPlacer:
+    """Orders columns one at a time, remembering where placed ports sit."""
+
+    def __init__(self, graph):
+        self.rows = {}  # (node id, port id) -> row within its node, counting the header as row 0
+        self.sizes = {}  # node id -> rows
+        for node in graph.nodes.values():
+            self.sizes[node.id] = len(node.ports) + 1
+            for row, port in enumerate(node.sorted_ports(), start=1):
+                self.rows[(node.id, port.id)] = row
+        self.peers = defaultdict(list)
+        for edge in graph.edges:
+            self.peers[edge.a_node].append((edge.b_node, edge.b_port))
+            self.peers[edge.b_node].append((edge.a_node, edge.a_port))
+        self.heights = {}  # Placed node id -> (top row, its column's height in rows)
+
+    def sort_key(self, node_id):
+        """Fully placed peers first, then partly placed, then unplaced; each by average peer port height."""
+        heights = [
+            (self.heights[peer][0] + self.rows[(peer, port)]) / self.heights[peer][1]
+            for peer, port in self.peers[node_id]
+            if peer in self.heights
+        ]
+        if not heights:
+            return (2, 0)
+        return (int(len(heights) < len(self.peers[node_id])), sum(heights) / len(heights))
+
+    def place(self, node_ids):
+        """Order one column's node ids and record their heights."""
+        ordered = sorted(node_ids, key=self.sort_key)
+        total = sum(self.sizes[node_id] for node_id in ordered)
+        top = 0
+        for node_id in ordered:
+            self.heights[node_id] = (top, total)
+            top += self.sizes[node_id]
+        return ordered
+
+
+def rack_sort_key(node):
+    """Order nodes as they sit in their rack: by rack, top unit first; unracked nodes last by name."""
+    if node.position is None:
+        return (1, "", 0, node.label)
+    return (0, node.rack, -node.position, node.label)
+
+
+@dataclass
+class ScheduleRow:
+    """One row of the cable schedule: a cable (or end-to-end path) from an A port to a B port."""
+
+    a_node: Node
+    a_port: Port
+    b_node: Node
+    b_port: Port
+    cable: Cable
+    via_patch_panel: bool
+
+
+def cable_schedule(graph):
+    """The graph's edges as ScheduleRows, in-scope end first, sorted by A device and port."""
+    nodes = {node.id: node for node in graph.nodes.values()}
+    ports = {(node.id, port.id): port for node in nodes.values() for port in node.ports.values()}
+    rows = []
+    for edge in graph.edges:
+        a_node, b_node = nodes[edge.a_node], nodes[edge.b_node]
+        a_port, b_port = ports[(edge.a_node, edge.a_port)], ports[(edge.b_node, edge.b_port)]
+        if b_node.in_scope and not a_node.in_scope:
+            a_node, a_port, b_node, b_port = b_node, b_port, a_node, a_port
+        rows.append(ScheduleRow(a_node, a_port, b_node, b_port, edge.cable, edge.via_patch_panel))
+    return sorted(rows, key=lambda row: (row.a_node.label, row.a_port.sort_key, row.b_node.label))

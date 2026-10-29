@@ -1,5 +1,8 @@
 """Views for nautobot_wiring_diagrams."""
 
+import csv
+import io
+
 import graphviz
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render
@@ -10,7 +13,7 @@ from nautobot.apps.views import GenericView, ObjectView
 from nautobot.dcim.models import Device, Location, Rack
 
 from nautobot_wiring_diagrams.forms import WiringDiagramOptionsForm, WiringDiagramScopeForm
-from nautobot_wiring_diagrams.graph import build_graph
+from nautobot_wiring_diagrams.graph import build_graph, cable_schedule
 from nautobot_wiring_diagrams.render import EXPORT_FORMATS, app_settings, render_diagram, render_inline_svg, to_dot
 
 SCOPE_MODELS = {"location": Location, "rack": Rack, "device": Device}
@@ -33,9 +36,11 @@ def diagram_context(request, scope_obj, form):
             "plugins:nautobot_wiring_diagrams:export", kwargs={"scope": scope_name(scope_obj), "pk": scope_obj.pk}
         ),
         "export_query": query.urlencode(),
-        "export_formats": list(EXPORT_FORMATS),
+        # CSV is the cable schedule; its button sits on the schedule card.
+        "export_formats": [fmt for fmt in EXPORT_FORMATS if fmt != "csv"],
         "node_count": len(graph.nodes),
         "edge_count": len(graph.edges),
+        "schedule": cable_schedule(graph),
     }
     max_nodes = app_settings().get("max_nodes", 500)
     if len(graph.nodes) > max_nodes:
@@ -115,12 +120,53 @@ class WiringDiagramExportView(GenericView):
         form = WiringDiagramOptionsForm(request.GET)
         options, render_kwargs = form.get_options()
         graph = build_graph(scope_obj, options, user=request.user)
-        dot = to_dot(graph, title=f"{scope_obj} wiring diagram", **render_kwargs)
-        try:
-            data = render_diagram(dot, fmt)
-        except graphviz.ExecutableNotFound:
-            return HttpResponse("Graphviz is not installed on the Nautobot server.", status=501)
+        if fmt == "csv":
+            data = schedule_csv(cable_schedule(graph))
+        else:
+            dot = to_dot(graph, title=f"{scope_obj} wiring diagram", **render_kwargs)
+            try:
+                data = render_diagram(dot, fmt)
+            except graphviz.ExecutableNotFound:
+                return HttpResponse("Graphviz is not installed on the Nautobot server.", status=501)
         response = HttpResponse(data, content_type=EXPORT_FORMATS[fmt])
         filename = f"{slugify(str(scope_obj)) or scope}-wiring.{fmt}"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+SCHEDULE_COLUMNS = (
+    "Device A",
+    "Port A",
+    "Device B",
+    "Port B",
+    "Cable",
+    "Type",
+    "Color",
+    "Status",
+    "Length",
+    "Via patch panel",
+)
+
+
+def schedule_csv(rows):
+    """Render cable schedule rows as CSV bytes."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(SCHEDULE_COLUMNS)
+    for row in rows:
+        cable = row.cable
+        writer.writerow(
+            (
+                row.a_node.label,
+                row.a_port.name,
+                row.b_node.label,
+                row.b_port.name,
+                str(cable),
+                cable.get_type_display() if cable.type else "",
+                f"#{cable.color}" if cable.color else "",
+                str(cable.status) if cable.status_id else "",
+                f"{cable.length} {cable.length_unit}".strip() if cable.length else "",
+                "yes" if row.via_patch_panel else "",
+            )
+        )
+    return output.getvalue().encode()

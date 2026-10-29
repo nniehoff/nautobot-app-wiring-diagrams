@@ -19,8 +19,9 @@ from nautobot.dcim.models import (
 )
 from nautobot.extras.models import Role, Status
 
-from nautobot_wiring_diagrams.graph import DiagramOptions, build_graph
-from nautobot_wiring_diagrams.render import COLOR_BY_TYPE, to_dot
+from nautobot_wiring_diagrams.graph import DiagramOptions, build_graph, cable_schedule
+from nautobot_wiring_diagrams.render import ARRANGE_FREE, COLOR_BY_TYPE, DEVICE_PALETTE, ORDER_RACK, to_dot
+from nautobot_wiring_diagrams.views import schedule_csv
 
 
 class WiringGraphTestCase(TestCase):
@@ -151,6 +152,33 @@ class WiringGraphTestCase(TestCase):
         self.assertIn("legend", by_type)
         self.assertIn(">CAT6<", by_type)
 
+    def test_power_hidden_by_default(self):
+        """Power cables are left out unless asked for."""
+        self.assertNotIn("power", DiagramOptions().kinds)
+
+    def test_dot_columns(self):
+        """Columns pin nodes with rank=same and attach cables to the facing side of each port."""
+        graph = build_graph(self.rack)
+        source = to_dot(graph).source
+        self.assertIn("rank=same", source)
+        self.assertRegex(source, r"n\d+:p\d+:e -- n\d+:p\d+:w")
+        self.assertIn("rank=same", to_dot(graph, order=ORDER_RACK).source)
+        self.assertNotIn("rank=same", to_dot(graph, arrange=ARRANGE_FREE).source)
+
+    def test_uncolored_cables_take_a_device_color(self):
+        """With no cable or type color, a cable takes its busier end's palette color."""
+        source = to_dot(build_graph(self.rack)).source
+        self.assertIn('color="#ff0000"', source)  # The copper cable keeps its own color.
+        self.assertTrue(any(f'color="{color}"' in source for color in DEVICE_PALETTE))
+
+    def test_schedule_csv(self):
+        """The schedule lists each cable from the in-scope end."""
+        rows = cable_schedule(build_graph(self.server))
+        lines = schedule_csv(rows).decode().splitlines()
+        self.assertTrue(lines[0].startswith("Device A,Port A,Device B,Port B"))
+        self.assertTrue(lines[1].startswith("srv1,eth0,sw1,eth1,"))
+        self.assertIn("CAT6,#ff0000", lines[1])
+
     def test_dot_escapes_names(self):
         """Names are escaped inside HTML-like labels."""
         self.server.name = "srv<&>"
@@ -196,6 +224,14 @@ class WiringDiagramViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("attachment", response["Content-Disposition"])
         self.assertTrue(response.content.startswith(b"graph wiring"))
+
+    def test_export_csv(self):
+        """The cable schedule exports as CSV."""
+        url = reverse("plugins:nautobot_wiring_diagrams:export", kwargs={"scope": "location", "pk": self.location.pk})
+        response = self.client.get(url, {"format": "csv"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertTrue(response.content.startswith(b"Device A,"))
 
     def test_export_bad_format(self):
         """Unknown formats are rejected."""

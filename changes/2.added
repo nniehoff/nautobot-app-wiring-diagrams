@@ -1,0 +1,4 @@
+Added a column layout that puts the busiest devices in the middle, splits redundant switch pairs either side of the devices cabled to both, and orders each column to keep cables level.
+Added pan, zoom, and hover highlighting of cables, ports, and devices to the diagram.
+Added a cable schedule table below the diagram, with CSV export.
+Added coloring of uncolored cables by the busier device they connect to.
