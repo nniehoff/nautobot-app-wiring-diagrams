@@ -1,4 +1,5 @@
-{% load form_helpers %}
+{% load form_helpers static %}
+<link rel="stylesheet" href="{% static 'nautobot_wiring_diagrams/wiring-diagram.css' %}">
 <div class="row">
     <div class="col-lg-3 col-md-4">
         <form method="get" class="card mb-3">
@@ -16,7 +17,7 @@
     </div>
     <div class="col-lg-9 col-md-8">
         {% if diagram_scope %}
-            <div class="card">
+            <div class="card mb-3" data-wd-diagram>
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><strong>{{ diagram_scope }}</strong> &middot; {{ node_count }} node{{ node_count|pluralize }}, {{ edge_count }} cable{{ edge_count|pluralize }}</span>
                     <div class="btn-group" role="group" aria-label="Export">
@@ -31,7 +32,26 @@
                     {% if diagram_error %}
                         <div class="alert alert-warning mb-0">{{ diagram_error }}</div>
                     {% elif diagram_svg %}
-                        <div class="nautobot-wiring-diagram" style="overflow: auto; max-height: 80vh;">
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
+                                <button type="button" class="btn btn-secondary" data-wd-zoom="in" title="Zoom in">
+                                    <span class="mdi mdi-magnify-plus-outline" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-wd-zoom="out" title="Zoom out">
+                                    <span class="mdi mdi-magnify-minus-outline" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-wd-zoom="width" title="Fit width">
+                                    <span class="mdi mdi-arrow-expand-horizontal" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-wd-zoom="all" title="Fit whole diagram">
+                                    <span class="mdi mdi-fit-to-screen-outline" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                            <small class="text-secondary ms-3">
+                                Drag or scroll to pan, pinch or Ctrl+scroll to zoom. Hover a cable, port or device to trace its cables.
+                            </small>
+                        </div>
+                        <div class="nautobot-wiring-diagram border rounded">
                             {{ diagram_svg }}
                         </div>
                     {% else %}
@@ -39,8 +59,53 @@
                     {% endif %}
                 </div>
             </div>
+            {% if schedule %}
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>Cable schedule</strong>
+                        <a class="btn btn-sm btn-secondary" href="{{ export_url }}?format=csv{% if export_query %}&{{ export_query }}{% endif %}">
+                            <span class="mdi mdi-download" aria-hidden="true"></span> CSV
+                        </a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Device A</th>
+                                    <th>Port A</th>
+                                    <th>Device B</th>
+                                    <th>Port B</th>
+                                    <th>Cable</th>
+                                    <th>Type</th>
+                                    <th>Color</th>
+                                    <th>Status</th>
+                                    <th>Length</th>
+                                    <th>Via patch panel</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in schedule %}
+                                    <tr>
+                                        <td><a href="{{ row.a_node.url }}">{{ row.a_node.label }}</a></td>
+                                        <td><a href="{{ row.a_port.url }}">{{ row.a_port.name }}</a></td>
+                                        <td><a href="{{ row.b_node.url }}">{{ row.b_node.label }}</a></td>
+                                        <td><a href="{{ row.b_port.url }}">{{ row.b_port.name }}</a></td>
+                                        <td><a href="{{ row.cable.get_absolute_url }}">{{ row.cable }}</a></td>
+                                        <td>{% if row.cable.type %}{{ row.cable.get_type_display }}{% endif %}</td>
+                                        <td>{% if row.cable.color %}<span class="wd-swatch" style="background-color: #{{ row.cable.color }}" title="#{{ row.cable.color }}"></span>{% endif %}</td>
+                                        <td>{% if row.cable.status_id %}{{ row.cable.status }}{% endif %}</td>
+                                        <td>{% if row.cable.length %}{{ row.cable.length }} {{ row.cable.length_unit }}{% endif %}</td>
+                                        <td>{% if row.via_patch_panel %}<span class="mdi mdi-check" aria-label="Yes"></span>{% endif %}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
         {% else %}
             <p class="text-secondary">Choose a Location, Rack, or Device.</p>
         {% endif %}
     </div>
 </div>
+<script src="{% static 'nautobot_wiring_diagrams/wiring-diagram.js' %}"></script>

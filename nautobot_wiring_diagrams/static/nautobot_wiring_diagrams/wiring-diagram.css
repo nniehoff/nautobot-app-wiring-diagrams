@@ -1,0 +1,43 @@
+.nautobot-wiring-diagram {
+    cursor: grab;
+    height: 75vh;
+    overflow: hidden;
+    touch-action: none;
+}
+
+.nautobot-wiring-diagram.wd-dragging {
+    cursor: grabbing;
+}
+
+.nautobot-wiring-diagram svg {
+    display: block;
+    height: 100%;
+    width: 100%;
+}
+
+.nautobot-wiring-diagram path.wd-hit {
+    pointer-events: stroke;
+    stroke: transparent;
+    stroke-width: 12;
+}
+
+.nautobot-wiring-diagram.wd-focus g.edge:not(.wd-lit) {
+    opacity: 0.12;
+}
+
+.nautobot-wiring-diagram.wd-focus g.node:not(.wd-lit) {
+    opacity: 0.3;
+}
+
+.nautobot-wiring-diagram.wd-focus g.edge.wd-lit path:not(.wd-hit) {
+    stroke-width: 4;
+}
+
+.wd-swatch {
+    border: 1px solid var(--bs-border-color, #adb5bd);
+    border-radius: 2px;
+    display: inline-block;
+    height: 1em;
+    vertical-align: middle;
+    width: 1.5em;
+}
