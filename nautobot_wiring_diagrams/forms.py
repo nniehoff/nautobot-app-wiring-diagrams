@@ -18,9 +18,12 @@ from nautobot_wiring_diagrams.render import (
     ARRANGE_COLUMNS,
     COLOR_BY_CABLE,
     COLOR_BY_CHOICES,
+    LINE_CURVED,
+    LINE_STYLE_CHOICES,
     ORDER_CABLES,
     ORDER_CHOICES,
     RANKDIR_CHOICES,
+    app_settings,
 )
 
 KIND_CHOICES = tuple((kind, kind.title()) for kind in CONNECTION_KINDS)
@@ -52,6 +55,12 @@ class WiringDiagramOptionsForm(BootstrapMixin, forms.Form):
         help_text="Draw end-to-end connections instead of each patch panel hop",
         required=False,
     )
+    line_style = forms.ChoiceField(
+        choices=LINE_STYLE_CHOICES,
+        help_text="Square lines always use columns, left to right, without rack boxes",
+        required=False,
+        widget=StaticSelect2(),
+    )
     arrange = forms.ChoiceField(
         choices=ARRANGE_CHOICES,
         help_text="Columns put the busiest devices in the middle and their peers beside them",
@@ -72,6 +81,16 @@ class WiringDiagramOptionsForm(BootstrapMixin, forms.Form):
     )
     color_by = forms.ChoiceField(choices=COLOR_BY_CHOICES, required=False, widget=StaticSelect2())
     rankdir = forms.ChoiceField(choices=RANKDIR_CHOICES, label="Direction", required=False, widget=StaticSelect2())
+
+    def __init__(self, *args, **kwargs):
+        """Preselect the configured default line style."""
+        super().__init__(*args, **kwargs)
+        self.fields["line_style"].initial = app_settings().get("default_line_style", LINE_CURVED)
+
+    def get_line_style(self):
+        """The chosen line style, or the configured default."""
+        chosen = self.cleaned_data.get("line_style") if self.is_bound and self.is_valid() else ""
+        return chosen or self.fields["line_style"].initial
 
     def get_options(self):
         """Return `(DiagramOptions, render kwargs)` from cleaned data, or defaults if unbound or invalid."""

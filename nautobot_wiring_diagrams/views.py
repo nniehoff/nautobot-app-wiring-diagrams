@@ -14,7 +14,15 @@ from nautobot.dcim.models import Device, Location, Rack
 
 from nautobot_wiring_diagrams.forms import WiringDiagramOptionsForm, WiringDiagramScopeForm
 from nautobot_wiring_diagrams.graph import build_graph, cable_schedule
-from nautobot_wiring_diagrams.render import EXPORT_FORMATS, app_settings, render_diagram, render_inline_svg, to_dot
+from nautobot_wiring_diagrams.render import (
+    EXPORT_FORMATS,
+    LINE_SQUARE,
+    app_settings,
+    render_diagram,
+    render_inline_svg,
+    to_dot,
+    to_layout,
+)
 
 SCOPE_MODELS = {"location": Location, "rack": Rack, "device": Device}
 
@@ -30,8 +38,11 @@ def diagram_context(request, scope_obj, form):
     graph = build_graph(scope_obj, options, user=request.user)
     query = request.GET.copy()
     query.pop("format", None)
+    square = form.get_line_style() == LINE_SQUARE
     context = {
         "diagram_scope": scope_obj,
+        "diagram_filename": f"{slugify(str(scope_obj)) or scope_name(scope_obj)}-wiring",
+        "square": square,
         "export_url": reverse(
             "plugins:nautobot_wiring_diagrams:export", kwargs={"scope": scope_name(scope_obj), "pk": scope_obj.pk}
         ),
@@ -48,6 +59,9 @@ def diagram_context(request, scope_obj, form):
             f"This diagram has {len(graph.nodes)} nodes, more than the configured maximum of {max_nodes}. "
             "Narrow the scope or filters, or export the diagram instead."
         )
+    elif graph.edges and square:
+        # Laid out and drawn in the browser by wiring-diagram-square.js; Graphviz is not involved.
+        context["diagram_layout"] = to_layout(graph, color_by=render_kwargs["color_by"], order=render_kwargs["order"])
     elif graph.edges:
         try:
             context["diagram_svg"] = mark_safe(  # noqa: S308 - Graphviz output; labels are escaped in render.py

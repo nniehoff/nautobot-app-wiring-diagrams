@@ -1,0 +1,2 @@
+Added a "Square with line jumps" line style, laid out in the browser with ELK, with PDF, SVG, and PNG downloads made in the browser.
+Added the `default_line_style` setting.

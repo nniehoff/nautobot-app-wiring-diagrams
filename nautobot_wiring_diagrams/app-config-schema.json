@@ -16,10 +16,22 @@
             "pattern": "^#?[0-9a-fA-F]{6}$",
             "default": "#6c757d"
         },
+        "default_line_style": {
+            "type": "string",
+            "description": "Default line style: \"curved\" (Graphviz) or \"square\" (square lines with jumps, laid out in the browser).",
+            "enum": [
+                "curved",
+                "square"
+            ],
+            "default": "curved"
+        },
         "default_rankdir": {
             "type": "string",
             "description": "Default Graphviz layout direction.",
-            "enum": ["LR", "TB"],
+            "enum": [
+                "LR",
+                "TB"
+            ],
             "default": "LR"
         },
         "max_nodes": {

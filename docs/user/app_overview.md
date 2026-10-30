@@ -20,6 +20,12 @@ Devices are laid out in columns by how many cabled ports they have, so most cabl
 
 Lines take the cable's own color, then a color per cable type if one is configured, then a color for the busier device at either end, so the cables of one switch share a color. Devices in scope are boxed by Rack when the diagram covers two or more Racks.
 
+Cables are drawn as curves by default. Choose **Line style: Square with line jumps** to draw them as horizontal and vertical runs instead, with a small hop wherever one cable crosses another, as in an electrical schematic. Square lines are laid out in the browser by [ELK](https://eclipse.dev/elk/) rather than by Graphviz, so:
+
+- They always use columns, left to right, and never draw rack boxes.
+- Their PDF, SVG, and PNG downloads are made in the browser from what is on screen. The export URL below always returns curved lines.
+- They do not need Graphviz on the server.
+
 In Nautobot, the diagram can be panned and zoomed. Hovering a cable highlights it and both of its ends; hovering a port or a device highlights all of its cables.
 
 Below the diagram, the **Cable schedule** lists every cable drawn: both devices and ports, the cable, its type, color, status and length, and whether the line stands for a path through patch panels. It downloads as CSV.

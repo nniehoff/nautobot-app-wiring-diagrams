@@ -22,6 +22,7 @@ The same tab is available on Locations (covering every device in the Location an
 - Set `cable_type_colors` in `PLUGINS_CONFIG` so each cable type has a consistent color. Then choose **Color by: Cable type** to add a legend to the diagram.
 - Try **Collapse patch panels** to see end-to-end connections through your patch panels.
 - Set **Order by: Rack position** to order devices as they sit in the rack instead of by the ports they are cabled to. Cables then cross more often.
+- Set **Line style: Square with line jumps** for straight horizontal and vertical cables that hop where they cross. Set `default_line_style` to `"square"` in `PLUGINS_CONFIG` to make it the default.
 - Set **Arrange: Graphviz default** to let Graphviz place devices on its own, as earlier versions did.
 - Use **Devices > Connections > Wiring Diagrams** to pick a scope without opening the object first.
 

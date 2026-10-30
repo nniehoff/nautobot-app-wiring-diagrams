@@ -17,21 +17,34 @@
     </div>
     <div class="col-lg-9 col-md-8">
         {% if diagram_scope %}
-            <div class="card mb-3" data-wd-diagram>
+            <div class="card mb-3" data-wd-diagram data-wd-filename="{{ diagram_filename }}">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><strong>{{ diagram_scope }}</strong> &middot; {{ node_count }} node{{ node_count|pluralize }}, {{ edge_count }} cable{{ edge_count|pluralize }}</span>
                     <div class="btn-group" role="group" aria-label="Export">
-                        {% for fmt in export_formats %}
-                            <a class="btn btn-sm btn-secondary" href="{{ export_url }}?format={{ fmt }}{% if export_query %}&{{ export_query }}{% endif %}">
-                                <span class="mdi mdi-download" aria-hidden="true"></span> {{ fmt|upper }}
-                            </a>
-                        {% endfor %}
+                        {% if diagram_layout %}
+                            {# Square lines are drawn in the browser, so they are exported there too. #}
+                            <button type="button" class="btn btn-sm btn-secondary" data-wd-export="pdf" disabled>
+                                <span class="mdi mdi-download" aria-hidden="true"></span> PDF
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-wd-export="svg" disabled>
+                                <span class="mdi mdi-download" aria-hidden="true"></span> SVG
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-wd-export="png" disabled>
+                                <span class="mdi mdi-download" aria-hidden="true"></span> PNG
+                            </button>
+                        {% else %}
+                            {% for fmt in export_formats %}
+                                <a class="btn btn-sm btn-secondary" href="{{ export_url }}?format={{ fmt }}{% if export_query %}&{{ export_query }}{% endif %}">
+                                    <span class="mdi mdi-download" aria-hidden="true"></span> {{ fmt|upper }}
+                                </a>
+                            {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-body">
                     {% if diagram_error %}
                         <div class="alert alert-warning mb-0">{{ diagram_error }}</div>
-                    {% elif diagram_svg %}
+                    {% elif diagram_svg or diagram_layout %}
                         <div class="d-flex align-items-center mb-2">
                             <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
                                 <button type="button" class="btn btn-secondary" data-wd-zoom="in" title="Zoom in">
@@ -51,9 +64,19 @@
                                 Drag or scroll to pan, pinch or Ctrl+scroll to zoom. Hover a cable, port or device to trace its cables.
                             </small>
                         </div>
-                        <div class="nautobot-wiring-diagram border rounded">
-                            {{ diagram_svg }}
-                        </div>
+                        {% if diagram_layout %}
+                            {{ diagram_layout|json_script:"wd-layout" }}
+                            <div class="nautobot-wiring-diagram border rounded"
+                                 data-wd-square="wd-layout"
+                                 data-wd-jspdf="{% static 'nautobot_wiring_diagrams/vendor/jspdf-4.2.1.umd.min.js' %}"
+                                 data-wd-svg2pdf="{% static 'nautobot_wiring_diagrams/vendor/svg2pdf-2.8.1.umd.min.js' %}">
+                                <p class="text-secondary m-3">Laying out the diagram&hellip;</p>
+                            </div>
+                        {% else %}
+                            <div class="nautobot-wiring-diagram border rounded">
+                                {{ diagram_svg }}
+                            </div>
+                        {% endif %}
                     {% else %}
                         <p class="text-secondary mb-0">No cables match these options.</p>
                     {% endif %}
@@ -109,3 +132,7 @@
     </div>
 </div>
 <script src="{% static 'nautobot_wiring_diagrams/wiring-diagram.js' %}"></script>
+{% if diagram_layout %}
+    <script src="{% static 'nautobot_wiring_diagrams/vendor/elk-0.12.0.bundled.js' %}"></script>
+    <script src="{% static 'nautobot_wiring_diagrams/wiring-diagram-square.js' %}"></script>
+{% endif %}
