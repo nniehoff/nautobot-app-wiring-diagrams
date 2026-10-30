@@ -20,7 +20,7 @@ from nautobot.dcim.models import (
 from nautobot.extras.models import Role, Status
 
 from nautobot_wiring_diagrams.graph import DiagramOptions, build_graph, cable_schedule
-from nautobot_wiring_diagrams.render import ARRANGE_FREE, COLOR_BY_TYPE, DEVICE_PALETTE, ORDER_RACK, to_dot
+from nautobot_wiring_diagrams.render import ARRANGE_FREE, COLOR_BY_TYPE, DEVICE_PALETTE, ORDER_RACK, to_dot, to_layout
 from nautobot_wiring_diagrams.views import schedule_csv
 
 
@@ -171,6 +171,22 @@ class WiringGraphTestCase(TestCase):
         self.assertIn('color="#ff0000"', source)  # The copper cable keeps its own color.
         self.assertTrue(any(f'color="{color}"' in source for color in DEVICE_PALETTE))
 
+    def test_square_layout(self):
+        """The square-line layout lists every port once, with cables leaving east and entering west."""
+        layout = to_layout(build_graph(self.rack))
+        ports = {(node["id"], port["id"]): port for node in layout["nodes"] for port in node["ports"]}
+        self.assertEqual(len(layout["edges"]), 3)
+        partitions = {node["id"]: node["partition"] for node in layout["nodes"]}
+        self.assertEqual(min(partitions.values()), 0)
+        for edge in layout["edges"]:
+            source, target = tuple(edge["source"]), tuple(edge["target"])
+            self.assertIn(source, ports)
+            self.assertIn(target, ports)
+            self.assertLessEqual(partitions[source[0]], partitions[target[0]])
+            if partitions[source[0]] < partitions[target[0]]:
+                self.assertEqual((ports[source]["side"], ports[target]["side"]), ("EAST", "WEST"))
+        self.assertIn("#ff0000", [edge["color"] for edge in layout["edges"]])
+
     def test_schedule_csv(self):
         """The schedule lists each cable from the in-scope end."""
         rows = cable_schedule(build_graph(self.server))
@@ -224,6 +240,20 @@ class WiringDiagramViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("attachment", response["Content-Disposition"])
         self.assertTrue(response.content.startswith(b"graph wiring"))
+
+    def test_square_line_style(self):
+        """Square lines send layout data to the page instead of a Graphviz SVG."""
+        url = reverse("plugins:nautobot_wiring_diagrams:location_wiring_diagram_tab", kwargs={"pk": self.location.pk})
+        response = self.client.get(url, {"line_style": "square"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["square"])
+        self.assertNotIn("diagram_svg", response.context)
+
+    @override_settings(PLUGINS_CONFIG={"nautobot_wiring_diagrams": {"default_line_style": "square"}})
+    def test_default_line_style_setting(self):
+        """The configured default line style applies when none is chosen."""
+        url = reverse("plugins:nautobot_wiring_diagrams:location_wiring_diagram_tab", kwargs={"pk": self.location.pk})
+        self.assertTrue(self.client.get(url).context["square"])
 
     def test_export_csv(self):
         """The cable schedule exports as CSV."""

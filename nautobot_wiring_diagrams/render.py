@@ -1,4 +1,4 @@
-"""Render a WiringGraph with Graphviz."""
+"""Render a WiringGraph with Graphviz, or as layout data for the square-line view."""
 
 from html import escape
 
@@ -35,6 +35,12 @@ ORDER_RACK = "rack"
 ORDER_CHOICES = (
     (ORDER_CABLES, "Keep cables level"),
     (ORDER_RACK, "Rack position"),
+)
+LINE_CURVED = "curved"
+LINE_SQUARE = "square"
+LINE_STYLE_CHOICES = (
+    (LINE_CURVED, "Curved"),
+    (LINE_SQUARE, "Square with line jumps"),
 )
 # Ports a cable leaves from and enters, for each direction: toward the next column, then away from it.
 FACING_PORTS = {"LR": ("e", "w"), "TB": ("s", "n")}
@@ -155,15 +161,80 @@ def to_dot(  # pylint: disable=too-many-arguments
     _add_nodes(dot, wiring_graph, group_by_rack)
     if columns:
         _add_columns(dot, wiring_graph, columns, order)
-    colors = {
-        "type_colors": config.get("cable_type_colors", {}),
-        "default_color": normalize_color(config.get("default_cable_color", "#6c757d")),
-        "device_colors": device_colors(wiring_graph),
-    }
+    colors = _color_config(config, wiring_graph)
     used_types = _add_edges(dot, wiring_graph, color_by, colors, columns, FACING_PORTS.get(rankdir, ("e", "w")))
     if used_types and color_by == COLOR_BY_TYPE:
         dot.node("legend", label=_legend(used_types, colors["type_colors"], colors["default_color"]))
     return dot
+
+
+def to_layout(wiring_graph, *, title="", color_by=COLOR_BY_CABLE, order=ORDER_CABLES):
+    """Graph data for the square-line view, which wiring-diagram-square.js lays out with ELK.
+
+    Nodes come in column order, top to bottom, each with the column it must stay in (`partition`, counting from
+    0) and the side of the box each port sits on. Edges point from the lower column to the higher one.
+    """
+    columns = assign_columns(wiring_graph)
+    by_column = _rack_columns(wiring_graph, columns)[0] if order == ORDER_RACK else order_columns(wiring_graph, columns)
+    edges, sides = _layout_edges(wiring_graph, columns, color_by)
+    return {"title": title, "nodes": _layout_nodes(wiring_graph, by_column, sides), "edges": edges}
+
+
+def _layout_edges(wiring_graph, columns, color_by):
+    """Edges for `to_layout`, and the side of its box each cabled port sits on."""
+    edge_colors = _edge_colors(wiring_graph, color_by, _color_config(app_settings(), wiring_graph))
+    sides = {}
+    edges = []
+    for index, edge in enumerate(wiring_graph.edges):
+        tail, head, same_column = _orient(edge, columns)
+        sides.setdefault(tail, "EAST")
+        sides.setdefault(head, "EAST" if same_column else "WEST")
+        cable = edge.cable
+        edges.append(
+            {
+                "id": f"wd-e{index}",
+                "source": list(tail),
+                "target": list(head),
+                "color": edge_colors[index],
+                "dash": STATUS_STYLES.get(cable.status.name.lower(), "") if cable.status_id else "",
+                "width": 3 if edge.via_patch_panel else 1 if edge.kind == "power" else 2,
+                "tooltip": _cable_tooltip(cable),
+                "url": cable.get_absolute_url(),
+                "classes": _hover_classes(tail, head),
+            }
+        )
+    return edges, sides
+
+
+def _layout_nodes(wiring_graph, by_column, sides):
+    """Nodes for `to_layout`, in column order, top to bottom."""
+    nodes = {node.id: node for node in wiring_graph.nodes.values()}
+    first = min(by_column, default=0)
+    return [
+        {
+            "id": node_id,
+            "label": nodes[node_id].label,
+            "subtitle": nodes[node_id].subtitle,
+            "url": nodes[node_id].url,
+            "inScope": nodes[node_id].in_scope,
+            "partition": column - first,
+            "ports": [
+                {"id": port.id, "name": port.name, "url": port.url, "side": sides.get((node_id, port.id), "EAST")}
+                for port in nodes[node_id].sorted_ports()
+            ],
+        }
+        for column in sorted(by_column)
+        for node_id in by_column[column]
+    ]
+
+
+def _color_config(config, wiring_graph):
+    """Color settings and the per-device palette that edge colors are picked from."""
+    return {
+        "type_colors": config.get("cable_type_colors", {}),
+        "default_color": normalize_color(config.get("default_cable_color", "#6c757d")),
+        "device_colors": device_colors(wiring_graph),
+    }
 
 
 def _add_nodes(dot, wiring_graph, group_by_rack):
@@ -221,17 +292,28 @@ def _rack_columns(wiring_graph, columns):
     return by_column, pinned
 
 
-def _edge_ends(edge, columns, facing):
-    """Graphviz tail and head (`node:port[:side]`) for an edge, and its layout and hover attributes."""
+def _orient(edge, columns):
+    """`(tail, head, same_column)` as `(node id, port id)` pairs, pointing outward from the lower column."""
     tail, head = (edge.a_node, edge.a_port), (edge.b_node, edge.b_port)
-    # Read by wiring-diagram.js to light up a cable and both of its ends.
-    attrs = {"class": f"wd-{tail[0]} wd-{head[0]} wd-{tail[0]}-{tail[1]} wd-{head[0]}-{head[1]}"}
-    if not columns:
-        return f"{tail[0]}:{tail[1]}", f"{head[0]}:{head[1]}", attrs
-    # Dot ranks undirected edges tail first, so point every edge outward from the lower column.
     if columns[tail[0]] > columns[head[0]]:
         tail, head = head, tail
-    if columns[tail[0]] == columns[head[0]]:
+    return tail, head, columns[tail[0]] == columns[head[0]]
+
+
+def _hover_classes(tail, head):
+    """Classes wiring-diagram.js reads to light up a cable and both of its ends."""
+    return f"wd-{tail[0]} wd-{head[0]} wd-{tail[0]}-{tail[1]} wd-{head[0]}-{head[1]}"
+
+
+def _edge_ends(edge, columns, facing):
+    """Graphviz tail and head (`node:port[:side]`) for an edge, and its layout and hover attributes."""
+    if not columns:
+        tail, head = (edge.a_node, edge.a_port), (edge.b_node, edge.b_port)
+        return f"{tail[0]}:{tail[1]}", f"{head[0]}:{head[1]}", {"class": _hover_classes(tail, head)}
+    # Dot ranks undirected edges tail first, so point every edge outward from the lower column.
+    tail, head, same_column = _orient(edge, columns)
+    attrs = {"class": _hover_classes(tail, head)}
+    if same_column:
         tail_side = head_side = facing[0]
         attrs["constraint"] = "false"
     else:

@@ -23,6 +23,7 @@ class WiringDiagramsConfig(NautobotAppConfig):
     default_settings = {
         "cable_type_colors": {},
         "default_cable_color": "#6c757d",
+        "default_line_style": "curved",
         "default_rankdir": "LR",
         "max_nodes": 500,
     }

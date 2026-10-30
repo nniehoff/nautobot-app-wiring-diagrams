@@ -194,5 +194,7 @@
         window.addEventListener("resize", () => setWidth(view.width, view.x, view.y));
     }
 
+    // wiring-diagram-square.js calls setup() again once its SVG is drawn; until then there is nothing to set up.
+    window.NautobotWiringDiagram = {setup: setup};
     document.querySelectorAll("[data-wd-diagram]").forEach(setup);
 })();

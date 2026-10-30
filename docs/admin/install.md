@@ -72,5 +72,6 @@ The app behavior can be controlled with the following list of settings:
 | --- | ------- | ------- | ----------- |
 | `cable_type_colors` | `{"cat6": "#1f77b4"}` | `{}` | Line color per Cable type value. Used for cables with no color of their own, and for every cable when the diagram is colored by type. |
 | `default_cable_color` | `"#333333"` | `"#6c757d"` | Line color when neither the cable nor its type has one. |
+| `default_line_style` | `"square"` | `"curved"` | Default line style: `curved` (drawn by Graphviz) or `square` (square lines with jumps, laid out in the browser). |
 | `default_rankdir` | `"TB"` | `"LR"` | Default layout direction: `LR` (left to right) or `TB` (top to bottom). |
 | `max_nodes` | `1000` | `500` | Diagrams with more nodes than this are not drawn in the page; they can still be exported. |
