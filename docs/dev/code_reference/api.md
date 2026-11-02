@@ -1,3 +1,3 @@
 # Nautobot Wiring Diagrams API Package
-!!! warning "Developer Note - Remove Me!"
-    This app does not expose a REST API (no model was defined).
+
+This app does not expose a REST API: it defines no models. Diagrams are downloaded from the export endpoint described in [External Interactions](../../user/external_interactions.md).

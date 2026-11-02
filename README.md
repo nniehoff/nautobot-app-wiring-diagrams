@@ -27,7 +27,7 @@ Nautobot Wiring Diagrams draws port-level wiring diagrams from the cables record
 
 Devices are laid out in columns, busiest in the middle, with redundant switch pairs split either side of the devices cabled to both, so most cables run a short, level way. Diagrams can be filtered by cable type, cable status, and connection kind (data, console, power). Cables are colored from their own color, a per-type color map set in the app config, or the switch they land on. Patch panels can be drawn hop by hop or collapsed into end-to-end connections. In Nautobot the diagram pans, zooms, and highlights a cable end to end on hover, with a cable schedule table below it. Every diagram downloads as PDF, SVG, PNG, or Graphviz DOT, and the schedule as CSV.
 
-Diagrams are rendered with [Graphviz](https://graphviz.org/), which must be installed on the Nautobot server.
+Diagrams and exports are rendered with [Graphviz](https://graphviz.org/), which must be installed on the Nautobot server. The optional square-line style is laid out in the browser instead.
 
 ## Documentation
 
