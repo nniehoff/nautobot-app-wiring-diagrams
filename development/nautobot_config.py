@@ -123,9 +123,51 @@ PLUGINS = ["nautobot_wiring_diagrams"]
 
 # Apps configuration settings. These settings are used by various Apps that the user may have installed.
 # Each key in the dictionary is the name of an installed App and its value is a dictionary of settings.
-# PLUGINS_CONFIG = {
-#     'nautobot_wiring_diagrams': {
-#         'foo': 'bar',
-#         'buzz': 'bazz'
-#     }
-# }
+# Every setting nautobot_wiring_diagrams reads, at its default. Omitted keys fall back to the same defaults
+# (default_settings in nautobot_wiring_diagrams/__init__.py).
+PLUGINS_CONFIG = {
+    "nautobot_wiring_diagrams": {
+        # Line color per cable type, keyed by Nautobot's CableTypeChoices value. A leading "#" is optional.
+        # Used when "Color by" is "Cable type", and by "Cable color" for cables with no color of their own.
+        # Types not listed here draw in default_cable_color. Every key Nautobot 3.2 accepts:
+        "cable_type_colors": {
+            # "aoc": "#17becf",
+            # "cat3": "#bcbd22",
+            # "cat5": "#bcbd22",
+            # "cat5e": "#1f77b4",
+            # "cat6": "#1f77b4",
+            # "cat6a": "#1f77b4",
+            # "cat7": "#1f77b4",
+            # "cat7a": "#1f77b4",
+            # "cat8": "#1f77b4",
+            # "coaxial": "#8c564b",
+            # "dac-active": "#9467bd",
+            # "dac-passive": "#9467bd",
+            # "mmf": "#ff7f0e",
+            # "mmf-om1": "#ff7f0e",
+            # "mmf-om2": "#ff7f0e",
+            # "mmf-om3": "#2ca02c",
+            # "mmf-om4": "#e377c2",
+            # "mmf-om5": "#2ca02c",
+            # "mrj21-trunk": "#8c564b",
+            # "other": "#6c757d",
+            # "power": "#000000",
+            # "smf": "#ffbf00",
+            # "smf-os1": "#ffbf00",
+            # "smf-os2": "#ffbf00",
+        },
+        # Fallback line color. "Color by: Cable type": types missing from cable_type_colors, and their legend
+        # row. "Color by: Busier device": devices without a palette color. Under "Cable color" an uncolored,
+        # unmapped cable takes the busier device's palette color instead, so this rarely shows there.
+        "default_cable_color": "#6c757d",
+        # Line style the form starts on: "curved" (Graphviz, server-side) or "square" (ELK, in the browser,
+        # with line jumps).
+        "default_line_style": "curved",
+        # Direction when the form's "Direction" is left blank: "LR" (left to right) or "TB" (top to bottom).
+        # Applies to the curved (Graphviz) view and its exports; the square view always runs left to right.
+        "default_rankdir": "LR",
+        # Largest diagram, in devices and other nodes, the page draws inline. Bigger scopes show a message
+        # asking to narrow the filters; exports are not limited.
+        "max_nodes": 500,
+    }
+}

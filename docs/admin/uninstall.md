@@ -4,21 +4,16 @@ Here you will find any steps necessary to cleanly remove the App from your Nauto
 
 ## Database Cleanup
 
-Prior to removing the app from the `nautobot_config.py`, run the following command to roll back any migration specific to this app.
-
-```shell
-nautobot-server migrate nautobot_wiring_diagrams zero
-```
-
-!!! warning "Developer Note - Remove Me!"
-    Any other cleanup operations to ensure the database is clean after the app is removed. Is there anything else that needs cleaning up, such as CFs, relationships, etc. if they're no longer desired?
+None needed. The app adds no models, custom fields, relationships, or jobs, so there is nothing in the database to remove.
 
 ## Remove App configuration
 
-Remove the configuration you added in `nautobot_config.py` from `PLUGINS` & `PLUGINS_CONFIG`.
+Remove `"nautobot_wiring_diagrams"` from `PLUGINS` and its entry from `PLUGINS_CONFIG` in `nautobot_config.py`, then restart Nautobot.
 
 ## Uninstall the package
 
 ```bash
-$ pip3 uninstall nautobot-wiring-diagrams
+pip3 uninstall nautobot-wiring-diagrams
 ```
+
+Remove the requirement from `local_requirements.txt` too, if you added it. Graphviz can be uninstalled if nothing else uses it.
