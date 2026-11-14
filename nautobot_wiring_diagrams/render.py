@@ -202,7 +202,7 @@ def page_candidates(page_size):
 
 def page_data(page_size):
     """The PDF page options wiring-diagram.js picks from, to show the page and scale before download."""
-    names = {PAGE_SIZES[key]: label.split(" (")[0] for key, label in PAGE_SIZE_CHOICES if key in PAGE_SIZES}
+    names = {PAGE_SIZES[key]: label.split(" (", maxsplit=1)[0] for key, label in PAGE_SIZE_CHOICES if key in PAGE_SIZES}
     return {
         "sizes": [{"name": names[size], "width": size[0], "height": size[1]} for size in page_candidates(page_size)],
         "margin": PAGE_MARGIN,
