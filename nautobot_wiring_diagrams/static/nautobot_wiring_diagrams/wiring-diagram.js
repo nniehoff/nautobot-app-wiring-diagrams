@@ -9,6 +9,65 @@
     const MAX_SCALE = 4;
     const ZOOM_STEP = 1.25;
     const DRAG_THRESHOLD = 4;
+    const LABEL_SIZE = 10;
+
+    // The PDF page and scale for a `width` x `height` diagram, or null for one page the diagram's size. A copy of
+    // render.pick_page: the first page it fits at full size, else the last scaled down, turned to match.
+    function pickPage(width, height, page) {
+        let picked = null;
+        for (const size of (page && page.sizes) || []) {
+            const [short, long] = [Math.min(size.width, size.height), Math.max(size.width, size.height)];
+            const [pageWidth, pageHeight] = width > height ? [long, short] : [short, long];
+            const scale = Math.min(
+                1,
+                (pageWidth - 2 * page.margin) / Math.max(width, 1),
+                (pageHeight - 2 * page.margin) / Math.max(height, 1),
+            );
+            picked = {name: size.name, width: pageWidth, height: pageHeight, scale: scale};
+            if (scale === 1) {
+                break;
+            }
+        }
+        return picked;
+    }
+
+    // The page options render.page_data() wrote for this diagram.
+    function pageData(wrapper) {
+        const script = document.getElementById(wrapper.dataset.wdPage || "");
+        return script ? JSON.parse(script.textContent) : null;
+    }
+
+    function inches(points) {
+        return (points / 72).toFixed(1).replace(/\.0$/, "");
+    }
+
+    // Say what page the PDF lands on, and warn when its labels would print too small to read.
+    function showPage(wrapper, width, height) {
+        const note = wrapper.querySelector("[data-wd-page-note]");
+        const page = pageData(wrapper);
+        if (!note || !page) {
+            return;
+        }
+        const picked = pickPage(width, height, page);
+        note.classList.remove("text-secondary", "text-warning");
+        if (!picked) {
+            note.classList.add("text-secondary");
+            note.textContent = `PDF: ${inches(width)} × ${inches(height)} in`;
+            return;
+        }
+        const orientation = picked.width > picked.height ? "landscape" : "portrait";
+        const percent = Math.round(picked.scale * 100);
+        if (picked.scale < page.warnBelow) {
+            note.classList.add("text-warning");
+            note.innerHTML = '<span class="mdi mdi-alert" aria-hidden="true"></span> ';
+            note.append(`PDF: ${picked.name} ${orientation} at ${percent}%, labels about ${(LABEL_SIZE * picked.scale).toFixed(1)} pt`);
+            note.title = "Labels may be hard to read. Choose a larger PDF page size, None, or narrow the diagram.";
+        } else {
+            note.classList.add("text-secondary");
+            note.textContent = `PDF: ${picked.name} ${orientation} at ${percent}%`;
+            note.title = "";
+        }
+    }
 
     function setup(wrapper) {
         const container = wrapper.querySelector(".nautobot-wiring-diagram");
@@ -22,6 +81,8 @@
         svg.removeAttribute("width");
         svg.removeAttribute("height");
         svg.setAttribute("preserveAspectRatio", "xMinYMin meet");
+        // Graphviz and the square view both draw in points; the curved PDF adds a title, so this is close.
+        showPage(wrapper, full.width, full.height);
 
         function apply() {
             svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.width} ${view.height}`);
@@ -195,6 +256,6 @@
     }
 
     // wiring-diagram-square.js calls setup() again once its SVG is drawn; until then there is nothing to set up.
-    window.NautobotWiringDiagram = {setup: setup};
+    window.NautobotWiringDiagram = {setup: setup, pickPage: pickPage, pageData: pageData};
     document.querySelectorAll("[data-wd-diagram]").forEach(setup);
 })();

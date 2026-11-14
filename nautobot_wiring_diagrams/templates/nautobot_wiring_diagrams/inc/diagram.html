@@ -17,7 +17,8 @@
     </div>
     <div class="col-lg-9 col-md-8">
         {% if diagram_scope %}
-            <div class="card mb-3" data-wd-diagram data-wd-filename="{{ diagram_filename }}">
+            {{ diagram_page|json_script:"wd-page" }}
+            <div class="card mb-3" data-wd-diagram data-wd-filename="{{ diagram_filename }}" data-wd-page="wd-page">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><strong>{{ diagram_scope }}</strong> &middot; {{ node_count }} node{{ node_count|pluralize }}, {{ edge_count }} cable{{ edge_count|pluralize }}</span>
                     <div class="btn-group" role="group" aria-label="Export">
@@ -63,6 +64,7 @@
                             <small class="text-secondary ms-3">
                                 Drag or scroll to pan, pinch or Ctrl+scroll to zoom. Hover a cable, port or device to trace its cables.
                             </small>
+                            <small class="ms-auto ps-3 text-nowrap" data-wd-page-note></small>
                         </div>
                         {% if diagram_layout %}
                             {{ diagram_layout|json_script:"wd-layout" }}

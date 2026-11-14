@@ -272,7 +272,7 @@
     }
 
     // jsPDF and svg2pdf.js load on the first PDF export; most views never need them.
-    async function exportPdf(svgText, filename, scripts) {
+    async function exportPdf(svgText, filename, scripts, page) {
         if (!root.jspdf) {
             await loadScript(scripts.jspdf);
         }
@@ -280,17 +280,24 @@
             await loadScript(scripts.svg2pdf);
         }
         const [width, height] = svgSize(svgText);
+        const picked = root.NautobotWiringDiagram.pickPage(width, height, page);
+        const [pageWidth, pageHeight, scale] = picked ? [picked.width, picked.height, picked.scale] : [width, height, 1];
         const holder = document.createElement("div");
         holder.style.cssText = "position:absolute;left:-100000px;top:0";
         holder.appendChild(document.importNode(new DOMParser().parseFromString(svgText, "image/svg+xml").documentElement, true));
         document.body.appendChild(holder);
         try {
             const pdf = new root.jspdf.jsPDF({
-                orientation: width > height ? "landscape" : "portrait",
+                orientation: pageWidth > pageHeight ? "landscape" : "portrait",
                 unit: "pt",
-                format: [width, height],
+                format: [pageWidth, pageHeight],
             });
-            await pdf.svg(holder.firstChild, {x: 0, y: 0, width: width, height: height});
+            await pdf.svg(holder.firstChild, {
+                x: (pageWidth - width * scale) / 2,
+                y: (pageHeight - height * scale) / 2,
+                width: width * scale,
+                height: height * scale,
+            });
             pdf.save(filename);
         } finally {
             holder.remove();
@@ -318,7 +325,7 @@
                             exportPng(svgText, `${name}.png`);
                         } else {
                             button.disabled = true;
-                            exportPdf(svgText, `${name}.pdf`, scripts)
+                            exportPdf(svgText, `${name}.pdf`, scripts, root.NautobotWiringDiagram.pageData(wrapper))
                                 .catch((error) => alert(`The PDF could not be made: ${error.message}`))
                                 .finally(() => {
                                     button.disabled = false;

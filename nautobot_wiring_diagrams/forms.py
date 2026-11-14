@@ -22,6 +22,8 @@ from nautobot_wiring_diagrams.render import (
     LINE_STYLE_CHOICES,
     ORDER_CABLES,
     ORDER_CHOICES,
+    PAGE_DIAGRAM,
+    PAGE_SIZE_CHOICES,
     RANKDIR_CHOICES,
     app_settings,
 )
@@ -81,16 +83,34 @@ class WiringDiagramOptionsForm(BootstrapMixin, forms.Form):
     )
     color_by = forms.ChoiceField(choices=COLOR_BY_CHOICES, required=False, widget=StaticSelect2())
     rankdir = forms.ChoiceField(choices=RANKDIR_CHOICES, label="Direction", required=False, widget=StaticSelect2())
+    page_size = forms.ChoiceField(
+        choices=PAGE_SIZE_CHOICES,
+        help_text="PDF downloads only. Larger diagrams are scaled down to fit; Auto takes the smallest page that "
+        "fits at full size",
+        label="PDF page size",
+        required=False,
+        widget=StaticSelect2(),
+    )
 
     def __init__(self, *args, **kwargs):
-        """Preselect the configured default line style."""
+        """Preselect the configured default line style and page size."""
         super().__init__(*args, **kwargs)
-        self.fields["line_style"].initial = app_settings().get("default_line_style", LINE_CURVED)
+        config = app_settings()
+        self.fields["line_style"].initial = config.get("default_line_style", LINE_CURVED)
+        self.fields["page_size"].initial = config.get("default_page_size", PAGE_DIAGRAM)
+
+    def _chosen(self, name):
+        """The chosen value of field `name`, or its initial value."""
+        chosen = self.cleaned_data.get(name) if self.is_bound and self.is_valid() else ""
+        return chosen or self.fields[name].initial
 
     def get_line_style(self):
         """The chosen line style, or the configured default."""
-        chosen = self.cleaned_data.get("line_style") if self.is_bound and self.is_valid() else ""
-        return chosen or self.fields["line_style"].initial
+        return self._chosen("line_style")
+
+    def get_page_size(self):
+        """The chosen PDF page size, or the configured default."""
+        return self._chosen("page_size")
 
     def get_options(self):
         """Return `(DiagramOptions, render kwargs)` from cleaned data, or defaults if unbound or invalid."""

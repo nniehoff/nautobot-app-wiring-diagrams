@@ -75,6 +75,7 @@ The app behavior can be controlled with the following list of settings:
 | `cable_type_colors` | `{"cat6": "#1f77b4"}` | `{}` | Line color per cable type, keyed by Nautobot's cable type value (`cat6`, `smf-os2`, `dac-passive`, `power`, ...). The leading `#` is optional. Used for every cable when **Color by** is **Cable type**, and for cables with no color of their own when it is **Cable color**. |
 | `default_cable_color` | `"#333333"` | `"#6c757d"` | Fallback line color: for cable types missing from `cable_type_colors` when coloring by type (and their legend row), and for a device with no palette color when coloring by device. Under **Cable color**, an uncolored, unmapped cable takes the busier device's color instead. |
 | `default_line_style` | `"square"` | `"curved"` | Line style the form starts on: `curved` (drawn by Graphviz on the server) or `square` (square lines with jumps, laid out in the browser). |
+| `default_page_size` | `"auto"` | `"diagram"` | PDF page size the form starts on: `diagram` (one page the size of the diagram), `auto` (the smallest of Letter, Legal, and Ledger the diagram fits at full size, else Ledger scaled down), or `letter`, `legal`, `ledger`, `a4`, `a3`. |
 | `default_rankdir` | `"TB"` | `"LR"` | Direction when the form's **Direction** is blank: `LR` (left to right) or `TB` (top to bottom). Curved diagrams and exports only; square lines always run left to right. |
 | `max_nodes` | `1000` | `500` | Diagrams with more nodes than this are not drawn in the page; they can still be exported. |
 
