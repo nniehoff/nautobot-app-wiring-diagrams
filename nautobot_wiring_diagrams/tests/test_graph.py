@@ -19,6 +19,7 @@ from nautobot.dcim.models import (
 )
 from nautobot.extras.models import Role, Status
 
+from nautobot_wiring_diagrams.forms import WiringDiagramOptionsForm
 from nautobot_wiring_diagrams.graph import DiagramOptions, build_graph, cable_schedule
 from nautobot_wiring_diagrams.render import ARRANGE_FREE, COLOR_BY_TYPE, DEVICE_PALETTE, ORDER_RACK, to_dot, to_layout
 from nautobot_wiring_diagrams.views import schedule_csv
@@ -248,6 +249,20 @@ class WiringDiagramViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["square"])
         self.assertNotIn("diagram_svg", response.context)
+
+    @override_settings(PLUGINS_CONFIG={"nautobot_wiring_diagrams": {"default_page_size": "auto"}})
+    def test_page_size(self):
+        """The chosen PDF page size wins over the configured default, which applies when none is chosen."""
+        self.assertEqual(WiringDiagramOptionsForm({"page_size": "letter"}).get_page_size(), "letter")
+        self.assertEqual(WiringDiagramOptionsForm({}).get_page_size(), "auto")
+        self.assertEqual(WiringDiagramOptionsForm(None).get_page_size(), "auto")
+
+    def test_page_data(self):
+        """The page gets the chosen PDF page sizes, by name, to show the scale before download."""
+        url = reverse("plugins:nautobot_wiring_diagrams:location_wiring_diagram_tab", kwargs={"pk": self.location.pk})
+        sizes = self.client.get(url, {"page_size": "letter"}).context["diagram_page"]["sizes"]
+        self.assertEqual(sizes, [{"name": "Letter", "width": 612, "height": 792}])
+        self.assertEqual(self.client.get(url).context["diagram_page"]["sizes"], [])
 
     @override_settings(PLUGINS_CONFIG={"nautobot_wiring_diagrams": {"default_line_style": "square"}})
     def test_default_line_style_setting(self):

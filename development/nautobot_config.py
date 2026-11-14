@@ -163,6 +163,10 @@ PLUGINS_CONFIG = {
         # Line style the form starts on: "curved" (Graphviz, server-side) or "square" (ELK, in the browser,
         # with line jumps).
         "default_line_style": "curved",
+        # PDF page size the form starts on: "diagram" (one page the diagram's size), "auto" (the smallest of
+        # Letter, Legal, and Ledger it fits at full size, else Ledger scaled down), or one of "letter", "legal",
+        # "ledger", "a4", "a3". Pages turn landscape for wide diagrams; SVG and PNG are not affected.
+        "default_page_size": "diagram",
         # Direction when the form's "Direction" is left blank: "LR" (left to right) or "TB" (top to bottom).
         # Applies to the curved (Graphviz) view and its exports; the square view always runs left to right.
         "default_rankdir": "LR",

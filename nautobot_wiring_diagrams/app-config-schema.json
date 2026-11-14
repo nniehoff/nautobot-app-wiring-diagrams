@@ -25,6 +25,20 @@
             ],
             "default": "curved"
         },
+        "default_page_size": {
+            "type": "string",
+            "description": "Default PDF page size: \"diagram\" (one page the diagram's size), \"auto\" (smallest of Letter, Legal, Ledger that fits), or a paper size.",
+            "enum": [
+                "diagram",
+                "auto",
+                "letter",
+                "legal",
+                "ledger",
+                "a4",
+                "a3"
+            ],
+            "default": "diagram"
+        },
         "default_rankdir": {
             "type": "string",
             "description": "Default Graphviz layout direction.",

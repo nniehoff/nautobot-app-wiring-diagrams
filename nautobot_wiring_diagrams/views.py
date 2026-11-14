@@ -18,6 +18,8 @@ from nautobot_wiring_diagrams.render import (
     EXPORT_FORMATS,
     LINE_SQUARE,
     app_settings,
+    fit_to_page,
+    page_data,
     render_diagram,
     render_inline_svg,
     to_dot,
@@ -52,6 +54,7 @@ def diagram_context(request, scope_obj, form):
         "node_count": len(graph.nodes),
         "edge_count": len(graph.edges),
         "schedule": cable_schedule(graph),
+        "diagram_page": page_data(form.get_page_size()),
     }
     max_nodes = app_settings().get("max_nodes", 500)
     if len(graph.nodes) > max_nodes:
@@ -139,6 +142,8 @@ class WiringDiagramExportView(GenericView):
         else:
             dot = to_dot(graph, title=f"{scope_obj} wiring diagram", **render_kwargs)
             try:
+                if fmt == "pdf":
+                    fit_to_page(dot, form.get_page_size())
                 data = render_diagram(dot, fmt)
             except graphviz.ExecutableNotFound:
                 return HttpResponse("Graphviz is not installed on the Nautobot server.", status=501)

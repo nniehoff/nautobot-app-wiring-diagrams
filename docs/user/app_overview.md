@@ -26,6 +26,10 @@ Cables are drawn as curves by default. Choose **Line style: Square with line jum
 - Their PDF, SVG, and PNG downloads are made in the browser from what is on screen. The export URL below always returns curved lines.
 - They do not need Graphviz on the server.
 
+PDFs are one page the size of the diagram by default (**PDF page size: None**), which suits large-format printers and plotters. Choose a page size (Letter, Legal, Ledger, A4, or A3) to print on office paper instead: the page turns landscape for a wide diagram, and a diagram too big for it is scaled down to fit inside a half-inch margin. **Auto** takes the smallest of Letter, Legal, and Ledger the diagram fits at full size, and scales it onto Ledger if it fits none. SVG and PNG downloads are not affected.
+
+Next to the zoom buttons, the page shows where the PDF will land, such as **PDF: Ledger landscape at 72%**, or its size in inches under **None**. Below 60%, where 10 pt labels print under 6 pt, the note turns into a warning; choose a larger page, **None**, or narrower filters.
+
 In Nautobot, the diagram can be panned and zoomed. Hovering a cable highlights it and both of its ends; hovering a port or a device highlights all of its cables.
 
 Below the diagram, the **Cable schedule** lists every cable drawn: both devices and ports, the cable, its type, color, status and length, and whether the line stands for a path through patch panels. It downloads as CSV.

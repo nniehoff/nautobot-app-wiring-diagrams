@@ -23,6 +23,7 @@ The same tab is available on Locations (covering every device in the Location an
 - Try **Collapse patch panels** to see end-to-end connections through your patch panels.
 - Set **Order by: Rack position** to order devices as they sit in the rack instead of by the ports they are cabled to. Cables then cross more often.
 - Set **Line style: Square with line jumps** for straight horizontal and vertical cables that hop where they cross. Set `default_line_style` to `"square"` in `PLUGINS_CONFIG` to make it the default.
+- Set **PDF page size** to **Letter**, **Legal**, or **Ledger** to print the PDF on paper, or **Auto** to take the smallest of those the diagram fits at full size. Set `default_page_size` in `PLUGINS_CONFIG` to make one the default.
 - Set **Arrange: Graphviz default** to let Graphviz place devices on its own, as earlier versions did.
 - Use **Devices > Connections > Wiring Diagrams** to pick a scope without opening the object first.
 

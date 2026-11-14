@@ -3,6 +3,7 @@
 from django.test import SimpleTestCase
 
 from nautobot_wiring_diagrams.graph import Edge, Node, Port, WiringGraph, assign_columns, cable_schedule, order_columns
+from nautobot_wiring_diagrams.render import PAGE_AUTO, PAGE_DIAGRAM, PAGE_SIZES, page_candidates, pick_page
 
 
 def make_graph(cables, in_scope=()):
@@ -109,3 +110,37 @@ class CableScheduleTestCase(SimpleTestCase):
             [(row.a_node.label, row.a_port.name, row.b_node.label) for row in rows],
             [("local", "p1", "other"), ("local", "p2", "remote")],
         )
+
+
+class PageSizeTestCase(SimpleTestCase):
+    """page_candidates and pick_page."""
+
+    def test_diagram_size_has_no_pages(self):
+        """The default keeps one page the diagram's size."""
+        self.assertEqual(page_candidates(PAGE_DIAGRAM), [])
+        self.assertIsNone(pick_page(500, 300, page_candidates(PAGE_DIAGRAM)))
+
+    def test_page_turns_to_match_the_diagram(self):
+        """Wide diagrams get a landscape page, tall ones portrait."""
+        letter = page_candidates("letter")
+        self.assertEqual(pick_page(500, 300, letter), (792, 612, 1))
+        self.assertEqual(pick_page(300, 500, letter), (612, 792, 1))
+
+    def test_large_diagram_scales_down_to_fit_inside_the_margins(self):
+        """A diagram bigger than the page is scaled to the page less its margins."""
+        page_width, page_height, scale = pick_page(1440, 600, page_candidates("letter"))
+        self.assertEqual((page_width, page_height), (792, 612))
+        self.assertAlmostEqual(scale, (792 - 72) / 1440)
+
+    def test_auto_takes_the_smallest_page_that_fits_at_full_size(self):
+        """Auto steps from Letter to Legal to Ledger."""
+        auto = page_candidates(PAGE_AUTO)
+        self.assertEqual(pick_page(700, 500, auto), (792, 612, 1))
+        self.assertEqual(pick_page(900, 500, auto), (1008, 612, 1))
+        self.assertEqual(pick_page(1100, 700, auto), (1224, 792, 1))
+
+    def test_auto_scales_the_largest_page_when_nothing_fits(self):
+        """Past Ledger, the diagram is scaled down onto Ledger."""
+        page_width, page_height, scale = pick_page(3000, 1000, page_candidates(PAGE_AUTO))
+        self.assertEqual((page_width, page_height), PAGE_SIZES["ledger"][::-1])
+        self.assertLess(scale, 1)

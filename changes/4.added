@@ -1,0 +1,2 @@
+Added a PDF page size option (None, Auto, Letter, Legal, Ledger, A4, or A3) that fits the PDF onto one page of that size, and the `default_page_size` setting.
+Added a note beside the diagram showing the PDF's page and scale, with a warning when labels would print under 6 pt.

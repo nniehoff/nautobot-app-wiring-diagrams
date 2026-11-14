@@ -1,5 +1,6 @@
 """Render a WiringGraph with Graphviz, or as layout data for the square-line view."""
 
+import json
 from html import escape
 
 import graphviz
@@ -42,6 +43,30 @@ LINE_STYLE_CHOICES = (
     (LINE_CURVED, "Curved"),
     (LINE_SQUARE, "Square with line jumps"),
 )
+PAGE_DIAGRAM = "diagram"
+PAGE_AUTO = "auto"
+# Portrait width and height in points; pages turn landscape for diagrams wider than they are tall.
+PAGE_SIZES = {
+    "letter": (612, 792),
+    "legal": (612, 1008),
+    "ledger": (792, 1224),
+    "a4": (595, 842),
+    "a3": (842, 1191),
+}
+# Smallest first: Auto takes the first that fits the diagram at full size.
+AUTO_PAGES = ("letter", "legal", "ledger")
+PAGE_SIZE_CHOICES = (
+    (PAGE_DIAGRAM, "None (one page the diagram's size)"),
+    (PAGE_AUTO, "Auto (Letter, Legal, or Ledger)"),
+    ("letter", "Letter (8.5 × 11 in)"),
+    ("legal", "Legal (8.5 × 14 in)"),
+    ("ledger", "Ledger (11 × 17 in)"),
+    ("a4", "A4"),
+    ("a3", "A3"),
+)
+PAGE_MARGIN = 36
+# Below this scale, 10 pt labels print under 6 pt and the page warns that they may be hard to read.
+PAGE_WARN_SCALE = 0.6
 # Ports a cable leaves from and enters, for each direction: toward the next column, then away from it.
 FACING_PORTS = {"LR": ("e", "w"), "TB": ("s", "n")}
 
@@ -166,6 +191,56 @@ def to_dot(  # pylint: disable=too-many-arguments
     if used_types and color_by == COLOR_BY_TYPE:
         dot.node("legend", label=_legend(used_types, colors["type_colors"], colors["default_color"]))
     return dot
+
+
+def page_candidates(page_size):
+    """Portrait `(width, height)` pages, in points, to fit a PDF onto; empty for one page the diagram's size."""
+    if page_size == PAGE_AUTO:
+        return [PAGE_SIZES[name] for name in AUTO_PAGES]
+    return [PAGE_SIZES[page_size]] if page_size in PAGE_SIZES else []
+
+
+def page_data(page_size):
+    """The PDF page options wiring-diagram.js picks from, to show the page and scale before download."""
+    names = {PAGE_SIZES[key]: label.split(" (")[0] for key, label in PAGE_SIZE_CHOICES if key in PAGE_SIZES}
+    return {
+        "sizes": [{"name": names[size], "width": size[0], "height": size[1]} for size in page_candidates(page_size)],
+        "margin": PAGE_MARGIN,
+        "warnBelow": PAGE_WARN_SCALE,
+    }
+
+
+def pick_page(width, height, candidates, margin=PAGE_MARGIN):
+    """`(page width, page height, scale)` for a `width` x `height` diagram, or None without candidates.
+
+    Takes the first candidate the diagram fits inside the margins at full size, else the last one scaled down.
+    Pages turn to match the diagram, and diagrams are never scaled up. wiring-diagram.js has a copy.
+    """
+    page = None
+    for portrait in candidates:
+        short, long = sorted(portrait)
+        page_width, page_height = (long, short) if width > height else (short, long)
+        scale = min(1, (page_width - 2 * margin) / max(width, 1), (page_height - 2 * margin) / max(height, 1))
+        page = (page_width, page_height, scale)
+        if scale == 1:
+            break
+    return page
+
+
+def fit_to_page(dot, page_size):
+    """Set Graphviz attributes that put a PDF of `dot` on one page of `page_size`, centered and scaled to fit."""
+    candidates = page_candidates(page_size)
+    if not candidates:
+        return
+    # Lay the graph out once to learn its size; `bb` is "llx,lly,urx,ury" in points.
+    llx, lly, urx, ury = (float(value) for value in json.loads(dot.pipe(format="json"))["bb"].split(","))
+    page_width, page_height, _ = pick_page(urx - llx, ury - lly, candidates)
+    dot.graph_attr.update(
+        center="true",
+        page=f"{page_width / 72:g},{page_height / 72:g}",
+        # Graphviz scales down, never up, to fit `size`.
+        size=f"{(page_width - 2 * PAGE_MARGIN) / 72:g},{(page_height - 2 * PAGE_MARGIN) / 72:g}",
+    )
 
 
 def to_layout(wiring_graph, *, title="", color_by=COLOR_BY_CABLE, order=ORDER_CABLES):
